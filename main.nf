@@ -1,27 +1,45 @@
-// TODO: include processes from submodules under modules/
-// include { TOOL } from './modules/<tool>/main.nf'
+// Long-read DNA-seq pipeline for Oxford Nanopore Technologies (ONT) data
+
+// CPU path:
+// GPU path:
+
+include { refFasta; faidxFor } from './modules/utils/references/references.nf' 
+include { PREPARE_SAMPLESHEET_LONG } from './modules/utils/samplesheet/main.nf'
+
 
 workflow {
-    // TODO: build the input channel, e.g.:
-    // ch_input = Channel.fromPath(params.input)
-    //     .map { f -> tuple([id: f.baseName], f) }
+    // Parameter validation
+    if (!(params.alignment.device in ['cpu', 'gpu'])) {
+        error "Invalid alignment device: ${params.alignment.device}. Must be 'cpu' or 'gpu'."
+    }
 
-    // TODO: wire processes, e.g.:
-    // ch_tool = TOOL(ch_input)
+    // Samplesheet preparation
+    if (params.samplesheet) {
+        samplesheet_ch = channel.fromPath(params.samplesheet, checkIfExists: true)
+    }
+    else if (params.reads_dir && params.reference_genome) {
+        samplesheet_ch = PREPARE_SAMPLESHEET_LONG(params.reads_dir, params.reference_genome)
+        samplesheet_ch = PREPARE_SAMPLESHEET_LONG.out.csv
+    }
+    else {
+        error "Either a samplesheet or both reads_dir and reference_genome must be provided."
+    }
 
-    // Once you have channels to publish, split this into `main:` / `publish:`:
-    //
-    //     main:
-    //     ch_tool = TOOL(ch_input)
-    //
-    //     publish:
-    //     tool = ch_tool
-    //
-    // and uncomment the matching `output {}` block below.
+    // reads_ch first
+    reads_ch = samplesheet_ch
+        .splitCsv(header: true)
+        .map { row ->
+            def meta = [
+                id: row.sample,
+                reference: row.reference,
+            ]
+            tuple(meta, file(row.reads, checkIfExists: true))
+        } 
+
+    // Redo basecalling if requested
+
+    // Alignment (+ filtering) step
+    
+    
 }
 
-// output {
-//     tool {
-//         path 'tool'
-//     }
-// }
