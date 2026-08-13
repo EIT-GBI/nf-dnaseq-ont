@@ -1,0 +1,44 @@
+# a samplesheet is all you need; leave null to build one from reads_dir
+samplesheet: '/mnt/gbi-shared/home/cristian-soitu/data/ont/simon_samples/20260729/samplesheet.csv'
+outdir: '/mnt/gbi-shared/home/cristian-soitu/data/ont/simon_samples/20260729/results/'
+
+# used when samplesheet is null: a directory of ONT reads + a reference
+reads_dir: null
+reference_genome: null
+
+# root dir holding all references (each needs a samtools faidx .fai alongside it)
+reference_dir: '/mnt/gbi-shared/home/cristian-eitgbi/data/references/misc/simon_methylation/'
+
+# Dorado re-basecalling on GPU.
+#   redo           : true -> the reads are raw POD5 (file or directory per sample)
+#                    and get re-basecalled; false -> reads are already basecalled.
+#   model          : path to a model baked into the container, or a bare model
+#                    name (Dorado then downloads it — needs internet on the node).
+#                    Baked in ghcr.io/eit-gbi/nf-mod-dorado:
+#                      /opt/models/dna_r10.4.1_e8.2_400bps_sup@v5.0.0  -> 5mCG_5hmCG, 6mA
+#                      /opt/models/dna_r10.4.1_e8.2_400bps_hac@v5.0.0  -> 6mA
+#   modified_bases : space-separated mod models, e.g. '5mCG_5hmCG', '6mA',
+#                    '5mCG_5hmCG 6mA'. '' = canonical bases only.
+basecalling:
+  redo: false
+  model: '/opt/models/dna_r10.4.1_e8.2_400bps_sup@v5.0.0'
+  modified_bases: '6mA'
+
+alignment:
+  device: 'gpu'
+  tool: 'dorado'
+
+# adapter/primer trimming with `dorado trim`, before alignment. dorado path only.
+# Off by default: dorado basecaller already trims, so this is for reads from elsewhere.
+trim:
+  enabled: true
+
+# read filtering. dorado path -> samtools filter on the BAM (keeps tags);
+# minimap2/parabricks paths -> chopper on the FASTQ, skipped when mods were called
+filter:
+  enabled: true
+  min_read_length: 1000
+  min_read_quality: 10
+
+
+ucsc_dir: null

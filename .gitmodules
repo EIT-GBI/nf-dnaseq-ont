@@ -1,3 +1,12 @@
 [submodule "modules/utils"]
 	path = modules/utils
 	url = https://github.com/eit-gbi/nf-mod-utils.git
+[submodule "modules/dorado"]
+	path = modules/dorado
+	url = https://github.com/eit-gbi/nf-mod-dorado.git
+[submodule "modules/samtools"]
+	path = modules/samtools
+	url = https://github.com/eit-gbi/nf-mod-samtools.git
+[submodule "modules/nanoplot"]
+	path = modules/nanoplot
+	url = https://github.com/eit-gbi/nf-mod-nanoplot.git
