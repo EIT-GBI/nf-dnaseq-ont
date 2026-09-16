@@ -10,3 +10,6 @@
 [submodule "modules/nanoplot"]
 	path = modules/nanoplot
 	url = https://github.com/eit-gbi/nf-mod-nanoplot.git
+[submodule "modules/modkit"]
+	path = modules/modkit
+	url = https://github.com/eit-gbi/nf-mod-modkit.git

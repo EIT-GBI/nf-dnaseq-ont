@@ -12,12 +12,17 @@ include { DORADO_ALIGNER } from './modules/dorado/aligner/main.nf'
 include { SAMTOOLS_FILTER } from './modules/samtools/filter/main.nf'
 include { SAMTOOLS_FLAGSTAT } from './modules/samtools/flagstat/main.nf'
 include { NANOPLOT_NANOPLOT } from './modules/nanoplot/nanoplot/main.nf'
+include { MODKIT_PILEUP } from './modules/modkit/pileup/main.nf'
+include { MODKIT_MOTIF_SEARCH } from './modules/modkit/motif_search/main.nf'
 
 
 workflow {
     // Parameter validation
     if (!(params.alignment.device in ['cpu', 'gpu'])) {
         error "Invalid alignment device: ${params.alignment.device}. Must be 'cpu' or 'gpu'."
+    }
+    if (params.alignment.tool != 'dorado') {
+        error "Invalid alignment tool: ${params.alignment.tool}. Only 'dorado' is implemented."
     }
 
     // Samplesheet preparation
@@ -35,11 +40,16 @@ workflow {
     // reads_ch first
     reads_ch = samplesheet_ch
         .splitCsv(header: true)
+        // drop entirely blank rows (trailing ",,"" lines are common in exported CSVs)
+        .filter { row -> row.values().any { it?.toString()?.trim() } }
         .map { row ->
             def meta = [
                 id: row.sample,
                 reference: row.reference,
             ]
+            // resolve the reference + .fai now, so a missing index fails in
+            // seconds rather than after basecalling has run for hours
+            faidxFor(meta)
             tuple(meta, file(row.reads, checkIfExists: true))
         } 
 
@@ -82,6 +92,25 @@ workflow {
     SAMTOOLS_FLAGSTAT(bam_ch.map {meta, bam, _bai -> tuple(meta, bam) })
 
     NANOPLOT_NANOPLOT(bam_ch)
+
+    // Methylation: per-site pileup, then de novo motif discovery.
+    // Requires basecalling.modified_bases to have been set, so the BAM
+    // carries MM/ML tags.
+    if (params.methylation?.enabled) {
+        pileup_in = bam_ch.multiMap { meta, bam, bai ->
+            bam:   tuple(meta, bam, bai)
+            fasta: faidxFor(meta)
+        }
+        MODKIT_PILEUP(pileup_in.bam, pileup_in.fasta)
+
+        if (params.methylation?.motif_search) {
+            motif_in = MODKIT_PILEUP.out.bedmethyl.multiMap { meta, bed ->
+                bed:   tuple(meta, bed)
+                fasta: faidxFor(meta)
+            }
+            MODKIT_MOTIF_SEARCH(motif_in.bed, motif_in.fasta)
+        }
+    }
 
 }
 

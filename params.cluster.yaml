@@ -40,5 +40,15 @@ filter:
   min_read_length: 1000
   min_read_quality: 10
 
+# Per-site methylation with modkit. Needs basecalling.modified_bases to have
+# been set so the BAM carries MM/ML tags.
+#   enabled      : run `modkit pileup` -> bedMethyl (one row per position/strand)
+#   motif_search : additionally run `modkit motif search` for de novo motifs
+# Tune the per-call confidence cutoff via ext.args, e.g.
+#   withName: 'MODKIT_PILEUP' { ext.args = '--filter-threshold 0.8' }
+methylation:
+  enabled: true
+  motif_search: true
+
 
 ucsc_dir: null
