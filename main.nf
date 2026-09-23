@@ -14,6 +14,7 @@ include { SAMTOOLS_FLAGSTAT } from './modules/samtools/flagstat/main.nf'
 include { NANOPLOT_NANOPLOT } from './modules/nanoplot/nanoplot/main.nf'
 include { MODKIT_PILEUP } from './modules/modkit/pileup/main.nf'
 include { MODKIT_MOTIF_SEARCH } from './modules/modkit/motif_search/main.nf'
+include { SAMTOOLS_CONSENSUS } from './modules/samtools/consensus/main.nf'
 
 
 workflow {
@@ -92,6 +93,15 @@ workflow {
     SAMTOOLS_FLAGSTAT(bam_ch.map {meta, bam, _bai -> tuple(meta, bam) })
 
     NANOPLOT_NANOPLOT(bam_ch)
+
+    // Consensus sequence: the genome as observed in this sample, straight from
+    // the pileup -- no variant calling. ext.args carries `-a`, so every reference
+    // position is emitted and anything below the depth cutoff becomes N; a
+    // deleted region therefore reads as a run of Ns rather than silently
+    // inheriting the reference sequence.
+    if (params.consensus?.enabled) {
+        SAMTOOLS_CONSENSUS(bam_ch.map { meta, bam, _bai -> tuple(meta, bam) })
+    }
 
     // Methylation: per-site pileup, then de novo motif discovery.
     // Requires basecalling.modified_bases to have been set, so the BAM

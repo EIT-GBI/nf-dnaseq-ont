@@ -51,4 +51,13 @@ methylation:
   motif_search: true
 
 
+# Per-sample consensus genome FASTA, built from the pileup with
+# `samtools consensus` -- no variant calling involved.
+#   min_depth : positions covered by fewer reads than this become N, so
+#               deletions show up as N-runs instead of reference sequence
+consensus:
+  enabled: true
+  min_depth: 10
+  min_mapq: 20
+
 ucsc_dir: null
