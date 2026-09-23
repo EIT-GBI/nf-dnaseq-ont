@@ -92,7 +92,7 @@ workflow {
     // QC 
     SAMTOOLS_FLAGSTAT(bam_ch.map {meta, bam, _bai -> tuple(meta, bam) })
 
-    NANOPLOT_NANOPLOT(bam_ch)
+    // NANOPLOT_NANOPLOT(bam_ch)
 
     // Consensus sequence: the genome as observed in this sample, straight from
     // the pileup -- no variant calling. ext.args carries `-a`, so every reference
