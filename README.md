@@ -93,6 +93,7 @@ At minimum set `samplesheet` (or `reads_dir` + `reference_genome`), `reference_d
 ### 4. Submit the run
 
 ```bash
+module load nextflow
 sbatch -J nf-driver -p cpu -t 5-00:00:00 \
   --wrap="nextflow run https://github.com/EIT-GBI/nf-dnaseq-ont.git -latest \
     -params-file params.cluster.yaml -profile cluster -resume"
@@ -100,10 +101,13 @@ sbatch -J nf-driver -p cpu -t 5-00:00:00 \
 
 Then watch it with `squeue -u $USER`, and read the driver's log with `tail -f slurm-<jobid>.out`.
 
+Load Nextflow before submitting: `sbatch` passes your current environment (including `PATH` and `NXF_WORK`) on to the job, so the job finds Nextflow and the work directory from your session. If `module load nextflow` fails, check `module avail nextflow` on the login node. If it lists nothing, the module is not available yet, so ask the platform team.
+
 ### What each part does
 
 | Part | What it does |
 |---|---|
+| `module load nextflow` | Puts Nextflow on your path. The job inherits it from your session when you submit. |
 | `sbatch` | Submits the job to SLURM and returns immediately. The job survives you logging out. |
 | `-J nf-driver` | Job **name**. This job is only the Nextflow *driver* — it submits and babysits the real work; the actual tools run in their own separate jobs. |
 | `-p cpu` | **Partition** (queue) for the driver. The driver itself is tiny, so `cpu` is right even though basecalling is GPU — the Dorado steps request the `gpu` partition themselves. |
@@ -127,6 +131,7 @@ If your run is small, you want to watch the progress bars live, and you don't mi
 
 ```bash
 tmux new -s nf              # start a named session
+module load nextflow
 nextflow run https://github.com/EIT-GBI/nf-dnaseq-ont.git -latest \
   -params-file params.cluster.yaml -profile cluster -resume
 ```
@@ -346,7 +351,7 @@ nextflow run main.nf -params-file params.cluster.yaml -profile cluster \
 **Gotchas:**
 - Nested params use dotted notation: `--basecalling.redo false`.
 - Values with spaces must be quoted: `--basecalling.modified_bases '5mCG_5hmCG 6mA'`.
-- The examples are written as `nextflow run main.nf` for brevity, i.e. from a clone. Running from GitHub, swap that for `nextflow run https://github.com/EIT-GBI/nf-dnaseq-ont.git -latest` and wrap the whole thing in `sbatch --wrap="..."` as above.
+- The examples are written as `nextflow run main.nf` for brevity, i.e. from a clone. Running from GitHub, swap that for `nextflow run https://github.com/EIT-GBI/nf-dnaseq-ont.git -latest` and submit it with `module load nextflow` then `sbatch --wrap="..."` as above.
 
 ---
 
@@ -415,6 +420,7 @@ Keep the **GPU count consistent** between `--gres` and `accelerator`.
 | `Failed to get read N signal: null output parameter passed to C API` | POD5 data not fully readable — truncated files, or a network/object-storage mount serving partial reads. Verify with `du -sh` vs `du -sh --apparent-size`, and stage the data to local/fast storage |
 | Job killed at exactly 24 h with exit 140 | Default walltime → set `time` on the process **and** `-t` on the driver |
 | `samtools quickcheck` flags a published BAM | Publish copy interrupted by an aborted run → recover from the task's `work/` directory |
+| `nextflow: command not found` | Nextflow is not loaded → `module load nextflow` before running `sbatch` |
 | `Invalid include source: .../modules/...` | Submodules not checked out → `git submodule update --init --recursive` |
 | Dorado: `'<model path>' is not a supported modification` | `--modified-bases` swallowed the positional args. It takes a variable-length list, so it must come **after** the model and reads |
 
