@@ -10,3 +10,4 @@
 #
 # Add one line per module submodule this pipeline depends on, for example:
 #   nf-mod-fastqc=2.0.0
+nf-mod-bedtools=v1.0.1

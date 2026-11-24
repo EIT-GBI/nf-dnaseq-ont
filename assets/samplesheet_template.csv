@@ -1,0 +1,2 @@
+id,sample,reads,reference
+SAMPLE1,my first sample,/path/to/reads/SAMPLE1/barcode01/reads.fastq.gz,ecoli/genome.fasta

@@ -1,0 +1,176 @@
+nextflow_pipeline {
+    name "Pipeline integrity"
+    script "../main.nf"
+
+    // DAG only, no containers. Also the only test reaching the dorado path.
+    test("stub run - full graph wires up") {
+
+        options "-stub-run"
+
+        then {
+            assert workflow.success
+            assert snapshot(workflow.trace.tasks().collect { it.name }.sort()).match()
+        }
+    }
+
+    // A samplesheet is the only way in; there is no reads_dir fallback.
+    test("no samplesheet - fails with a clear error") {
+
+        options "-stub-run"
+
+        when {
+            params {
+                samplesheet = null
+            }
+        }
+
+        then {
+            assert workflow.failed
+            assert workflow.stdout.any { it.contains('params.samplesheet is required') }
+        }
+    }
+
+    // Regression test. Biological correctness is checked at module level.
+    test("full pipeline - output files are unchanged") {
+
+        config "../conf/test_full.config"
+
+        then {
+            assert workflow.success
+
+            // bam/bai excluded: the @PG header carries the command line, so
+            // md5 moves with cpus/ext.args. logs carry wall-clock times.
+            assert snapshot(
+                getAllFilesFromDir("${launchDir}/results-test", ignore: ['**/*.bam', '**/*.bai', '**/*.log'])
+            ).match()
+        }
+    }
+
+    // Two barcodes fan out as <sample>_1/_2, then merge back to <sample>.
+    test("stub run - barcodes of a sample are merged") {
+
+        options "-stub-run"
+        config "../conf/test_barcodes.config"
+
+        then {
+            assert workflow.success
+
+            def tasks = workflow.trace.tasks().collect { it.name }
+
+            // per-barcode up to the merge
+            assert tasks.contains('DORADO_ALIGNER (SAMPLE1_1)')
+            assert tasks.contains('DORADO_ALIGNER (SAMPLE1_2)')
+            assert tasks.contains('SAMTOOLS_FILTER (SAMPLE1_1)')
+            assert tasks.contains('SAMTOOLS_FILTER (SAMPLE1_2)')
+
+            // one merge, one of everything after it
+            assert tasks.count { it.startsWith('SAMTOOLS_MERGE') } == 1
+            assert tasks.contains('SAMTOOLS_MERGE (SAMPLE1)')
+            assert tasks.count { it.startsWith('SAMTOOLS_FLAGSTAT') } == 1
+            assert tasks.contains('SAMTOOLS_FLAGSTAT (SAMPLE1)')
+            assert tasks.contains('SAMTOOLS_CONSENSUS (SAMPLE1)')
+
+            assert snapshot(tasks.sort()).match()
+        }
+    }
+
+    // A single-barcode sample's BAM already is the sample's: no merge task.
+    test("stub run - single-barcode samples skip the merge") {
+
+        options "-stub-run"
+
+        then {
+            assert workflow.success
+            assert workflow.trace.tasks().collect { it.name }.every { !it.startsWith('SAMTOOLS_MERGE') }
+        }
+    }
+
+    // The new schema itself -- every other test feeds an old three-column
+    // sheet, so without this the new column names are never parsed.
+    test("stub run - new samplesheet schema is read") {
+
+        options "-stub-run"
+        config "../conf/test_new_schema.config"
+
+        then {
+            assert workflow.success
+
+            def tasks = workflow.trace.tasks().collect { it.name }
+
+            assert tasks.contains('SAMTOOLS_FILTER (SAMPLE1_1)')
+            assert tasks.contains('SAMTOOLS_FILTER (SAMPLE1_2)')
+            assert tasks.contains('SAMTOOLS_MERGE (SAMPLE1)')
+
+            // SAMPLE2 has one barcode: no suffix, no merge
+            assert tasks.contains('SAMTOOLS_FILTER (SAMPLE2)')
+            assert tasks.count { it.startsWith('SAMTOOLS_MERGE') } == 1
+
+            assert tasks.count { it.startsWith('SAMTOOLS_FLAGSTAT') } == 2
+            assert tasks.contains('SAMTOOLS_FLAGSTAT (SAMPLE1)')
+            assert tasks.contains('SAMTOOLS_FLAGSTAT (SAMPLE2)')
+
+            assert snapshot(tasks.sort()).match()
+        }
+    }
+
+    // The template's own shape: id,sample,reads,reference, with `sample` as
+    // the name and fai falling back to <fasta>.fai.
+    test("stub run - template samplesheet shape is read") {
+
+        options "-stub-run"
+        config "../conf/test_template_schema.config"
+
+        then {
+            assert workflow.success
+
+            def tasks = workflow.trace.tasks().collect { it.name }
+            assert tasks.contains('SAMTOOLS_MERGE (SAMPLE1)')
+            assert tasks.contains('SAMTOOLS_FLAGSTAT (SAMPLE1)')
+            assert tasks.contains('SAMTOOLS_FLAGSTAT (SAMPLE2)')
+            assert tasks.count { it.startsWith('SAMTOOLS_MERGE') } == 1
+        }
+    }
+
+    // The real merge, with samtools actually running.
+    test("full pipeline - merged barcodes produce one BAM per sample") {
+
+        config "../conf/test_barcodes_full.config"
+
+        then {
+            assert workflow.success
+
+            def outdir = "${launchDir}/results-test-barcodes"
+
+            // No merged/ folder: the merged BAM takes the plain sample name
+            // and sits with the _1/_2 parts it was built from.
+            assert path("${outdir}/filtered").list().collect { it.fileName.toString() }.sort() == [
+                'SAMPLE1.bam', 'SAMPLE1.bam.bai',
+                'SAMPLE1_1.filtered.bam', 'SAMPLE1_1.filtered.bam.bai',
+                'SAMPLE1_2.filtered.bam', 'SAMPLE1_2.filtered.bam.bai',
+            ]
+            assert !path("${outdir}").list().collect { it.fileName.toString() }.contains('merged')
+
+            // downstream: one sample, not two
+            assert path("${outdir}/qc/flagstat").list().collect { it.fileName.toString() } ==
+                ['SAMPLE1.flagstat.txt']
+            assert path("${outdir}/consensus").list().collect { it.fileName.toString() } ==
+                ['SAMPLE1.consensus.fa']
+
+            // built after the merge: one track spanning both barcodes
+            assert path("${outdir}/bigwig").list().collect { it.fileName.toString() } ==
+                ['SAMPLE1.bw']
+
+            // no barcode dropped or duplicated: the filtered BAMs hold 138
+            // and 132 reads
+            def flagstat = path("${outdir}/qc/flagstat/SAMPLE1.flagstat.txt").text
+            def total = (flagstat =~ /^(\d+) \+ \d+ in total/)[0][1] as Integer
+            assert total == 138 + 132
+
+            assert snapshot(
+                flagstat,
+                path("${outdir}/consensus/SAMPLE1.consensus.fa"),
+                path("${outdir}/bigwig/SAMPLE1.bw")
+            ).match()
+        }
+    }
+}

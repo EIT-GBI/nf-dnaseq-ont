@@ -1,10 +1,5 @@
-# a samplesheet is all you need; leave null to build one from reads_dir
 samplesheet: '/mnt/gbi-shared/home/cristian-soitu/data/ont/simon_samples/20260729/samplesheet.csv'
 outdir: '/mnt/gbi-shared/home/cristian-soitu/data/ont/simon_samples/20260729/results/'
-
-# used when samplesheet is null: a directory of ONT reads + a reference
-reads_dir: null
-reference_genome: null
 
 # root dir holding all references (each needs a samtools faidx .fai alongside it)
 reference_dir: '/mnt/gbi-shared/home/cristian-eitgbi/data/references/misc/simon_methylation/'

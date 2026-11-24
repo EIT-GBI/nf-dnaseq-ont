@@ -1,0 +1,4 @@
+id,name,ont_r,fasta,fai
+SAMPLE1,E. coli replicate 1,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE1.barcode01.unaligned.bam,ecoli/genome.fasta,ecoli/genome.fasta.fai
+SAMPLE1,E. coli replicate 1,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE1.barcode02.unaligned.bam,ecoli/genome.fasta,ecoli/genome.fasta.fai
+SAMPLE2,E. coli replicate 2,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE2.unaligned.bam,ecoli/genome.fasta,ecoli/genome.fasta.fai
