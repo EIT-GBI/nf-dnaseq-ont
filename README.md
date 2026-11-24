@@ -12,8 +12,8 @@ This guide is written for researchers who want to run the pipeline on their own 
 
 ```mermaid
 flowchart TD
-    A[POD5 or basecalled BAM/FASTQ] --> B[PREPARE_SAMPLESHEET_LONG<br/><i>build samplesheet.csv</i>]
-    B --> C{basecalling.redo}
+    A[samplesheet.csv<br/><i>one row per sample+barcode</i>] --> B2[group rows into samples]
+    B2 --> C{basecalling.redo}
 
     C -->|true| D[DORADO_BASECALLER<br/><i>GPU, optional --modified-bases</i>]
     C -->|false| E[reads used as-is]
@@ -31,10 +31,16 @@ flowchart TD
     J -->|true| K[SAMTOOLS_FILTER<br/><i>read length / mean quality</i>]
     J -->|false| L[aligned BAM]
 
-    K --> M[BAM + index]
-    L --> M
+    K --> M1[per-barcode BAM + index]
+    L --> M1
+
+    M1 --> M2{more than one row<br/>for this sample?}
+    M2 -->|yes| M3[SAMTOOLS_MERGE<br/><i>parts _1.._N into one BAM, MM/ML kept</i>]
+    M2 -->|no| M[BAM + index]
+    M3 --> M
 
     M --> N[SAMTOOLS_FLAGSTAT<br/><i>alignment metrics</i>]
+    M --> N2[BEDTOOLS_BIGWIG<br/><i>coverage track for IGV/UCSC</i>]
     M --> O[NANOPLOT_NANOPLOT<br/><i>read-length / quality QC</i>]
     M --> P{methylation.enabled}
     P -->|true| Q[MODKIT_PILEUP<br/><i>bedMethyl: per-site % modified</i>]
@@ -50,7 +56,9 @@ flowchart TD
 | Trimming | `dorado trim` | GPU queue | yes — `trim.enabled` |
 | Alignment | `dorado aligner` (minimap2) | GPU queue | no |
 | Filtering | `samtools view -e` | CPU | yes — `filter.enabled` |
+| Part merge | `samtools merge` | CPU | automatic — only for samples with >1 row |
 | QC | `samtools flagstat`, `NanoPlot` | CPU | no |
+| Coverage track | `bedtools genomecov` + `bedGraphToBigWig` | CPU | yes — `bigwig.enabled` (on by default) |
 | Per-site methylation | `modkit pileup` | CPU | yes — `methylation.enabled` |
 | Motif discovery | `modkit motif search` | CPU | yes — `methylation.motif_search` |
 
@@ -88,7 +96,7 @@ curl -O https://raw.githubusercontent.com/EIT-GBI/nf-dnaseq-ont/main/params.clus
 nano params.cluster.yaml     # or vim, or edit it in your interactive session.
 ```
 
-At minimum set `samplesheet` (or `reads_dir` + `reference_genome`), `reference_dir`, and `outdir`. If you are re-basecalling, also check `basecalling.model` and `basecalling.modified_bases`. See [Key parameters](#key-parameters).
+At minimum set `samplesheet`, `reference_dir`, and `outdir`. If you are re-basecalling, also check `basecalling.model` and `basecalling.modified_bases`. See [Key parameters](#key-parameters).
 
 ### 4. Submit the run
 
@@ -142,43 +150,105 @@ Detach with `Ctrl-b` then `d`, and come back later with `tmux attach -t nf`. If 
 
 ## Preparing your inputs
 
-You give the pipeline reads in one of **two ways**:
+A **samplesheet is the only way in** — set `samplesheet` and the pipeline reads
+everything from it. There is no reads-directory mode.
 
-### Option A — point it at a reads directory (easiest)
+### Start from the template
 
-Set `reads_dir` and `reference_genome`, leave `samplesheet: null`, and the pipeline builds the samplesheet for you. Accepted files:
-
+```bash
+curl -O https://raw.githubusercontent.com/EIT-GBI/nf-dnaseq-ont/main/assets/samplesheet_template.csv
 ```
-<sample>.fastq.gz   <sample>.fq.gz   <sample>.fastq   <sample>.fq   <sample>.bam
-```
 
-The sample name is the filename with the suffix stripped.
-
-> This mode does **not** discover POD5 directories. If you are re-basecalling (`basecalling.redo: true`), use Option B.
-
-### Option B — provide your own samplesheet
-
-Set `samplesheet` to a CSV with these columns:
+That gives you one mock row to edit:
 
 ```csv
-sample,reads,reference
-RMC,/abs/path/pod5_pass/barcode41,misc/simon_methylation/RMC.fa
-wt,/abs/path/pod5_pass/barcode42,misc/simon_methylation/wt.fa
+id,sample,reads,reference
+SAMPLE1,my first sample,/path/to/reads/SAMPLE1/barcode01/reads.fastq.gz,ecoli/genome.fasta
 ```
 
-| Column | Meaning |
-|---|---|
-| `sample` | Sample name; used for output filenames and the process `tag` |
-| `reads` | POD5 **directory** (when `basecalling.redo: true`), or a basecalled BAM/FASTQ (when `false`) |
-| `reference` | Path **relative to `reference_dir`** |
+Replace the row with one per **(sample, barcode)** — see
+[One sample, several barcodes](#one-sample-several-barcodes) — then point
+`samplesheet` at the file:
+
+```yaml
+samplesheet: '/abs/path/to/samplesheet_template.csv'
+```
+
+| Column | Required | Meaning |
+|---|---|---|
+| `id` | yes | Unique sample identifier (the link to LIMS/ELN); used for output filenames and the process `tag` |
+| `sample` | no | Human-readable sample name. Defaults to `id` |
+| `reads` | yes | POD5 **directory** (when `basecalling.redo: true`), or a basecalled BAM/FASTQ (when `false`) |
+| `reference` | yes | Reference FASTA, **relative to `reference_dir`** (or absolute) |
+
+Relative `reads` paths resolve against the samplesheet's own directory, relative
+`reference` paths against `reference_dir`. Absolute paths and URLs are used as-is.
+
+### The full column set
+
+The template uses short, friendly column names. They are aliases for the schema
+shared with the short-read pipelines, which you can write out in full instead:
+
+```csv
+id,name,ont_r,fasta,fai
+RMC,RMC methylation,/abs/path/pod5_pass/barcode41,misc/simon_methylation/RMC.fa,misc/simon_methylation/RMC.fa.fai
+wt,wild type,/abs/path/pod5_pass/barcode42,misc/simon_methylation/wt.fa,misc/simon_methylation/wt.fa.fai
+```
+
+| Full name | Template alias | Required | Meaning |
+|---|---|---|---|
+| `id` | `id` | yes | Unique sample identifier |
+| `name` | `sample` | no | Human-readable sample name. Defaults to `id` |
+| `ont_r` | `reads` | yes | ONT reads for one barcode |
+| `fasta` | `reference` | yes | Reference FASTA |
+| `fai` | — | no | Its `samtools faidx` index. Defaults to `<fasta>.fai` |
+
+The shared schema also carries `il_r1`/`il_r2`, `av_r1`/`av_r2` and `pb_r` for
+the other platforms; this pipeline is ONT-only and ignores them.
+
+> A sheet with no `id` column at all is read the old way, with `sample` as the
+> identifier — so existing `sample,reads,reference` samplesheets keep working.
+
 
 Each sample can use a different reference — useful when comparing engineered strains.
+
+#### One sample, several barcodes
+
+**One row is one (sample, barcode) pair.** To declare a sample sequenced across
+several barcodes, give it one row per barcode, repeating the same
+`id`/`sample`/`reference` on each:
+
+```csv
+id,sample,reads,reference
+RMC,RMC methylation,/abs/path/pod5_pass/barcode41,refs/RMC.fa
+RMC,RMC methylation,/abs/path/pod5_pass/barcode42,refs/RMC.fa
+```
+
+Whether a sample needs merging is decided up front, from the number of rows it
+has. If it has more than one, basecalling, trimming, alignment and filtering run
+**once per row**, in parallel, and every file they produce is suffixed `_1`,
+`_2` … in order of the read path, so the numbering is stable across runs. `SAMTOOLS_MERGE` joins them straight after
+filtering, and the merged BAM takes the **plain sample name** — so for a
+two-barcode `RMC` with filtering on:
+
+```
+aligned/    RMC_1.sorted.bam    RMC_2.sorted.bam
+filtered/   RMC_1.filtered.bam  RMC_2.filtered.bam   RMC.bam   <- merged
+```
+
+The merged BAM is published next to the parts it came from — `filtered/` when
+`filter.enabled`, `aligned/` otherwise — rather than in a folder of its own, and
+everything from QC onwards sees one BAM per sample. A sample with a single row
+never gets a suffix and skips the merge entirely.
+
+> Rows of the same `id` that disagree on the name, reference or platform are a
+> hard error — it almost always means two different samples were given the same `id`.
 
 > Entirely blank rows (trailing `,,` lines, common in exported CSVs) are skipped automatically. A row with *some* fields filled and `reads` empty still fails loudly, which is intended.
 
 ### Reference genome layout
 
-References live under `reference_dir`, and each `reference` column entry is the path **relative** to it. For example, with:
+References live under `reference_dir`, and each `reference` column entry is the path **relative** to it (an absolute path or a URL is used as-is). For example, with:
 
 ```yaml
 reference_dir: "/mnt/gbi-shared/.../references/"
@@ -209,9 +279,7 @@ These live in `params.cluster.yaml`:
 
 | Parameter | Meaning |
 |---|---|
-| `samplesheet` | Path to a samplesheet CSV, or `null` to build one from `reads_dir` |
-| `reads_dir` | Directory of reads (used when `samplesheet: null`) |
-| `reference_genome` | Reference FASTA relative to `reference_dir` (used when `samplesheet: null`) |
+| `samplesheet` | Path to the samplesheet CSV (**required**) |
 | `reference_dir` | Root directory holding reference genomes + `.fai` indexes |
 | `outdir` | Where published results go |
 | `basecalling.redo` | `true` → reads are raw POD5 and get re-basecalled on GPU; `false` → reads are already basecalled |
@@ -225,6 +293,8 @@ These live in `params.cluster.yaml`:
 | `filter.min_read_quality` | Minimum mean base quality |
 | `methylation.enabled` | Run `modkit pileup` to produce per-site bedMethyl |
 | `methylation.motif_search` | Additionally run `modkit motif search` for de novo motifs |
+| `bigwig.enabled` | Build a per-sample `.bw` coverage track after the merge (**default `true`**) |
+| `ucsc_dir` | Only for a **container-less local** run: directory holding `bedGraphToBigWig`. The bedtools image already bakes it in, so leave it `null` otherwise |
 
 ### Models baked into `ghcr.io/eit-gbi/nf-mod-dorado`
 
@@ -361,11 +431,12 @@ Results are published under `outdir`:
 
 ```
 outdir/
-├── samplesheet/          # generated samplesheet.csv (Option A only)
 ├── basecalled/           # unaligned BAM with MM/ML tags (when redo: true)
 ├── trimmed/              # adapter-trimmed unaligned BAM
-├── aligned/              # sorted BAM + .bai
-├── filtered/             # length/quality-filtered BAM + .bai
+├── aligned/              # sorted BAM + .bai (parts as _1/_2)
+├── filtered/             # length/quality-filtered BAM + .bai; parts as _1/_2,
+│                         #   plus the merged <sample>.bam for multi-row samples
+├── bigwig/               # per-sample coverage track (.bw) for IGV / UCSC
 ├── methylation/          # bedMethyl (per-site % modified) + pileup logs
 │   └── motifs/           # de novo motif TSVs + search logs
 └── qc/
@@ -413,7 +484,8 @@ Keep the **GPU count consistent** between `--gres` and `accelerator`.
 
 | Symptom | Likely cause / fix |
 |---|---|
-| `Argument of file() function cannot be empty` | A samplesheet row with an empty `reads` column. Fully blank rows are skipped automatically; this means a partially-filled one |
+| `Samplesheet needs the columns id,name,ont_r,fasta,fai ...` | A row missing the id, reads or reference. Fully blank rows are skipped automatically; this means a partially-filled one |
+| `Samplesheet rows for sample '<id>' disagree on ...` | Two rows share an `id` but give a different name, reference or platform. Either they are the same sample (make the values match) or they are two samples that need distinct `id`s |
 | `No such file or directory: <ref>.fa.fai` (within seconds of starting) | Missing reference index → `samtools faidx <ref>.fa` for every reference in the samplesheet |
 | `Failed to pull singularity image … 403 Forbidden` | Private GHCR package with no registry auth on the node → `apptainer remote login --username <user> docker://ghcr.io`, then pre-pull into `apptainer.cacheDir` |
 | `No POD5 or FAST5 data found in path: <dir>` | The reads path is not bound into the container → add the mount to `apptainer.runOptions` (e.g. `-B /mnt/instrument-data`) |

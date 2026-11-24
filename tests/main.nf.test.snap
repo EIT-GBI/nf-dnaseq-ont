@@ -1,0 +1,110 @@
+{
+    "full pipeline - merged barcodes produce one BAM per sample": {
+        "content": [
+            "270 + 0 in total (QC-passed reads + QC-failed reads)\n270 + 0 primary\n0 + 0 secondary\n0 + 0 supplementary\n0 + 0 duplicates\n0 + 0 primary duplicates\n264 + 0 mapped (97.78% : N/A)\n264 + 0 primary mapped (97.78% : N/A)\n0 + 0 paired in sequencing\n0 + 0 read1\n0 + 0 read2\n0 + 0 properly paired (N/A : N/A)\n0 + 0 with itself and mate mapped\n0 + 0 singletons (N/A : N/A)\n0 + 0 with mate mapped to a different chr\n0 + 0 with mate mapped to a different chr (mapQ>=5)\n",
+            "SAMPLE1.consensus.fa:md5,12dddbe0510aaab94d0f805109b52979",
+            "SAMPLE1.bw:md5,e28bab408924410d8dea90b9cc6fede5"
+        ],
+        "timestamp": "2026-11-24T15:02:30.473461",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "25.10.4"
+        }
+    },
+    "stub run - barcodes of a sample are merged": {
+        "content": [
+            [
+                "BEDTOOLS_BIGWIG (SAMPLE1)",
+                "DORADO_ALIGNER (SAMPLE1_1)",
+                "DORADO_ALIGNER (SAMPLE1_2)",
+                "DORADO_TRIM (SAMPLE1_1)",
+                "DORADO_TRIM (SAMPLE1_2)",
+                "SAMTOOLS_CONSENSUS (SAMPLE1)",
+                "SAMTOOLS_FILTER (SAMPLE1_1)",
+                "SAMTOOLS_FILTER (SAMPLE1_2)",
+                "SAMTOOLS_FLAGSTAT (SAMPLE1)",
+                "SAMTOOLS_MERGE (SAMPLE1)"
+            ]
+        ],
+        "timestamp": "2026-11-24T16:01:55.796121",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "25.10.4"
+        }
+    },
+    "full pipeline - output files are unchanged": {
+        "content": [
+            [
+                "SAMPLE1.bw:md5,e28bab408924410d8dea90b9cc6fede5",
+                "SAMPLE2.bw:md5,390b60ed467aeafd02d145e1e5444ca1",
+                "SAMPLE1.consensus.fa:md5,12dddbe0510aaab94d0f805109b52979",
+                "SAMPLE2.consensus.fa:md5,d3bb4cb009e47891fdff938d545f127c",
+                "SAMPLE1.bedmethyl.bed:md5,7c5d6ef34ff2504ddfe5bd4666a1b6e8",
+                "SAMPLE2.bedmethyl.bed:md5,ea65db253a8cdb048b6d571029ac9b3e",
+                "SAMPLE1.motifs.tsv:md5,388389b3e76ff1034832f46f3da36af5",
+                "SAMPLE2.motifs.tsv:md5,388389b3e76ff1034832f46f3da36af5",
+                "SAMPLE1.flagstat.txt:md5,512e63b23bd0ba315536f3df10d46fe0",
+                "SAMPLE2.flagstat.txt:md5,2e8d319d881a5cdcc5525ac5b7b1ac16"
+            ]
+        ],
+        "timestamp": "2026-11-24T14:59:46.901888",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "25.10.4"
+        }
+    },
+    "stub run - full graph wires up": {
+        "content": [
+            [
+                "BEDTOOLS_BIGWIG (SAMPLE1)",
+                "BEDTOOLS_BIGWIG (SAMPLE2)",
+                "DORADO_ALIGNER (SAMPLE1)",
+                "DORADO_ALIGNER (SAMPLE2)",
+                "DORADO_TRIM (SAMPLE1)",
+                "DORADO_TRIM (SAMPLE2)",
+                "MODKIT_MOTIF_SEARCH (SAMPLE1)",
+                "MODKIT_MOTIF_SEARCH (SAMPLE2)",
+                "MODKIT_PILEUP (SAMPLE1)",
+                "MODKIT_PILEUP (SAMPLE2)",
+                "SAMTOOLS_CONSENSUS (SAMPLE1)",
+                "SAMTOOLS_CONSENSUS (SAMPLE2)",
+                "SAMTOOLS_FILTER (SAMPLE1)",
+                "SAMTOOLS_FILTER (SAMPLE2)",
+                "SAMTOOLS_FLAGSTAT (SAMPLE1)",
+                "SAMTOOLS_FLAGSTAT (SAMPLE2)"
+            ]
+        ],
+        "timestamp": "2026-11-24T14:59:31.040312",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "25.10.4"
+        }
+    },
+    "stub run - new samplesheet schema is read": {
+        "content": [
+            [
+                "BEDTOOLS_BIGWIG (SAMPLE1)",
+                "BEDTOOLS_BIGWIG (SAMPLE2)",
+                "DORADO_ALIGNER (SAMPLE1_1)",
+                "DORADO_ALIGNER (SAMPLE1_2)",
+                "DORADO_ALIGNER (SAMPLE2)",
+                "DORADO_TRIM (SAMPLE1_1)",
+                "DORADO_TRIM (SAMPLE1_2)",
+                "DORADO_TRIM (SAMPLE2)",
+                "SAMTOOLS_CONSENSUS (SAMPLE1)",
+                "SAMTOOLS_CONSENSUS (SAMPLE2)",
+                "SAMTOOLS_FILTER (SAMPLE1_1)",
+                "SAMTOOLS_FILTER (SAMPLE1_2)",
+                "SAMTOOLS_FILTER (SAMPLE2)",
+                "SAMTOOLS_FLAGSTAT (SAMPLE1)",
+                "SAMTOOLS_FLAGSTAT (SAMPLE2)",
+                "SAMTOOLS_MERGE (SAMPLE1)"
+            ]
+        ],
+        "timestamp": "2026-11-24T16:02:07.533698",
+        "meta": {
+            "nf-test": "0.9.5",
+            "nextflow": "25.10.4"
+        }
+    }
+}

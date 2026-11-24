@@ -3,3 +3,6 @@
 work/
 results/
 extra/
+.nf-test/
+results-test*/
+.nf-test.log

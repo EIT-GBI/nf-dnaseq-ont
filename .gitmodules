@@ -13,3 +13,9 @@
 [submodule "modules/modkit"]
 	path = modules/modkit
 	url = https://github.com/eit-gbi/nf-mod-modkit.git
+[submodule "modules/minimap2"]
+	path = modules/minimap2
+	url = https://github.com/eit-gbi/nf-mod-minimap2.git
+[submodule "modules/bedtools"]
+	path = modules/bedtools
+	url = https://github.com/eit-gbi/nf-mod-bedtools.git

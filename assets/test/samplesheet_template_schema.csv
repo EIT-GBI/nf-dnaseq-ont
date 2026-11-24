@@ -1,0 +1,4 @@
+id,sample,reads,reference
+SAMPLE1,my first sample,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE1.barcode01.unaligned.bam,ecoli/genome.fasta
+SAMPLE1,my first sample,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE1.barcode02.unaligned.bam,ecoli/genome.fasta
+SAMPLE2,my second sample,https://raw.githubusercontent.com/eit-gbi/generate-test-seq-data/v1.0.0/data/ont/ecoli/ubam/SAMPLE2.unaligned.bam,ecoli/genome.fasta
